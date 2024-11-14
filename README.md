@@ -1,19 +1,16 @@
-# docker-roonserver
-RoonServer downloading Roon on first run
-
-This little project configures a docker image for running RoonServer.
-It downloads RoonServer if not found on an external volume.
+# Roon Server Image
+A Docker image that installs and configures Roon Server the first time you run it as a container.
 
 Example start:
 
     docker run -d \
       --net=host \
-      -e TZ="Europe/Amsterdam" \
+      -e TZ="America/Los_Angeles" \
       -v roon-app:/app \
       -v roon-data:/data \
       -v roon-music:/music \
       -v roon-backups:/backup \
-      steefdebruijn/docker-roonserver:latest
+      david-noble/roon-server:latest
   
   * You should set `TZ` to your timezone.
   * You can change the volume mappings to local file system paths if you like.
@@ -23,7 +20,7 @@ Example start:
 
 ## Systemd
 
-If you deploy on a host with `systemd`, you should use a systemd service to start the Roon service.
+If you deploy on a host with `systemd`, you should use a systemd service to start the Roon server.
 
 Example `systemd` service (adapt to your environment):
 
@@ -68,7 +65,7 @@ Example `docker-compose.yaml` (adapt to your environment):
         hostname: docker-roonserver
         network_mode: host
         environment:
-          TZ: "Europe/Amsterdam"
+          TZ: "America/Los_Angeles"
         volumes:
           - roon-app:/app
           - roon-data:/data
@@ -110,7 +107,7 @@ Run the Roon container with the right privileges. Some of these are docker-relat
 
 ## Network issues
 
-  If your docker host has multiple networks attached and your core has trouble finding audio sinks/endpoints, you can try using a specific docker network setup as described in issue #1:
+If your docker host has multiple networks attached and your core has trouble finding audio sinks/endpoints, you can try using a specific docker network setup as described in issue #1:
 
     docker network create -d macvlan \
        --subnet 192.168.1.0/24 --gateway 192.168.1.1 \
