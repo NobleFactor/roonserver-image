@@ -1,5 +1,5 @@
 # Roon Server Image
-A Docker image that installs and configures Roon Server the first time you run it as a container.
+A Docker image that installs and configures a Roon server the first time you run it as a container.
 
 Example start:
 
