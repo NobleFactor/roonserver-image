@@ -1,0 +1,146 @@
+#!/bin/bash
+
+#################################################
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+#############################################
+
+# TODO (DANOBLE) Reference SPDX document that references MIT and Roon software terms and conditions.
+
+set -o errexit -o nounset
+
+###########
+# Variables
+###########
+
+declare -r script_root="$(cd "$(dirname "$0")" && pwd)"
+declare -r script_name="$(basename "$0")"
+
+###########
+# Functions
+###########
+
+function usage {
+    echo ""
+    echo "NAME"
+    echo "       ${script_name} - Uninstalls Roon Server"
+    echo ""
+    echo "SYNOPSIS"
+    echo "       ${script_name} [--remove-data] [--help]"
+    echo ""
+    echo "DESCRIPTION"
+    echo "       ${script_name} requires root privileges. Use the --remove-data option if you wish to remove Roon's data"
+    echo "       directory. Roon's backup and music directories are never touched."
+    echo ""
+    echo "OPTIONS"
+    echo "       -h|--help"
+    echo "           Prints this usage text and exits."
+    echo ""
+    echo "       --remove-data"
+    echo "           Removes Roon's data directory. Roon's backup and music directories are never touched. Use this option"
+    echo "           with discretion."
+    echo ""
+    exit 0
+}
+
+function error {
+    local exit_code=$1 && shift 1
+    echo "[$(date --iso-8601=seconds)] ${script_name} error: $@" 1>&2
+    exit $exit_code
+}
+
+function note {
+    echo "[$(date --iso-8601=seconds)] ${script_name} note: $@" 1>&2
+}
+
+function on_error_or_interrupt {
+    note "Failed: The state of the Roon Server on '${roon_serverroot}' is uncertain."
+}
+
+###################
+# Prerequsite check
+###################
+
+if [[ $EUID -ne 0 ]]; then
+    error 1 "Must run as root."
+fi
+
+declare arch=$(uname -m)
+
+if [[ $arch != x86_64 ]]; then
+    error 1 "Requires x86_64, not $arch."
+fi
+
+if ! which systemctl >/dev/null; then
+    error 1 "Requires systemctl on PATH."
+fi
+
+if ! systemctl list-unit-files roonserver.service >/dev/null; then
+    error 1 "Roon Server is not installed."
+fi
+
+###########
+# Arguments
+###########
+
+declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,remove-data:" -- $* || echo exit)
+eval set -- "$args"
+
+while [[ $1 != '--' ]]; do
+    case $1 in
+    -h|--help)
+        usage; # does not return
+        shift 1
+        ;;
+    --remove-data)
+        declare -r remove_data=true
+        shift 1
+        ;;
+   *)
+        error 1 "Unrecognized option: $1"
+        ;;
+  esac
+
+done
+
+######
+# Main
+######
+
+eval declare -A roon_environment=$(echo "( $(systemctl show roonserver --property Environment | cut -f2- -d= | sed 's/ROON_\([^ \t]*\)=/[ROON_\1]=/g') )")
+
+declare -r roon_serverroot="${roon_environment[ROON_SERVERROOT]}"
+declare -r roon_dataroot="${roon_environment[ROON_DATAROOT]}"
+
+if [[ -z $roon_serverroot ]] || [[ ! -d $roon_serverroot ]]; then
+    error 1 \
+        "Excepted the name of a directory for ROON_SERVERROOT, not '$roon_serverroot'. (1) Correct the value of 'Environment=ROON_SERVERROOT' in" \
+        "/etc/systemd/system/roonserver.service; (2) Issue this command: sudo systemctl daemon-reload. (3) Then run ${script_name} again."
+fi
+
+if [[ -z $roon_dataroot ]] ||  [[ ! -d $roon_dataroot ]]; then
+    error 1 \
+        "Excepted the name of a directory for ROON_DATAROOT, not '$roon_dataroot'. (1) Correct the value of 'Environment=ROON_DATAROOT' in" \
+        "/etc/systemd/system/roonserver.service; (2) Issue this command: sudo systemctl daemon-reload. (3) Then run ${script_name} again."
+fi
+
+if [[ -f "${roon_serverroot}/check.sh" ]] && "${roon_serverroot}/check.sh"; then
+
+    note "Uninstalling Roon Server at '${roon_serverroot}'"
+    trap on_error_or_interrupt ERR SIGINT SIGKILL SIGTERM
+
+    systemctl stop roonserver | true
+    rm --recursive --dir "${roon_serverroot}"
+    rm $(readlink --canonicalize-existing /etc/systemd/system/roonserver.service) /etc/systemd/system/roonserver.service
+
+    if [[ remove_data == true ]]; then
+        note "Removing Roon data on '${roon_dataroot}'"
+        rm --recursive --dir "${roon_dataroot}/*"
+    fi
+    
+    note "Completed."
+else
+    note "Failed: The check for a runnable instance of Roon Server at '$roon_serverroot' failed. To resolve the issue, verify" \
+        "the Roon Server environment by running this command: sudo systemctl show roonserver --propert=Environment." \
+        "Troubleshoot from there."
+fi

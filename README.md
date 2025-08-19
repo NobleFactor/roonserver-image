@@ -20,36 +20,7 @@ Example start:
 
 ## Systemd
 
-If you deploy on a host with `systemd`, you should use a systemd service to start the Roon server.
-
-Example `systemd` service (adapt to your environment):
-
-    [Unit]
-    Description=Roon
-    After=docker.service
-    Requires=docker.service
-    
-    [Service]
-    TimeoutStartSec=0
-    TimeoutStopSec=180
-    ExecStartPre=-/usr/bin/docker kill %n
-    ExecStartPre=-/usr/bin/docker rm -f %n
-    ExecStartPre=/usr/bin/docker pull steefdebruijn/docker-roonserver
-    ExecStart=/usr/bin/docker \
-      run --name %n \
-      --net=host \
-      -e TZ="Europe/Amsterdam" \
-      -v roon-app:/app \
-      -v roon-data:/data \
-      -v roon-music:/music \
-      -v roon-backups:/backup \
-      steefdebruijn/docker-roonserver
-    ExecStop=/usr/bin/docker stop %n
-    Restart=always
-    RestartSec=10s
-    
-    [Install]
-    WantedBy=multi-user.target
+You must use a systemd service to start the Roon Server.
 
 ## Docker-compose
 
@@ -84,7 +55,7 @@ Example `docker-compose.yaml` (adapt to your environment):
 If you find yourself in trouble using remote SMB/CIFS shares, you probably need some additional privileges on the container.
 You have two options here (see also issue #15):
 
-Run the Roon container in privileged mode
+Run the Roon Server container in privileged mode
 
     # standalone or from systemd service:
     docker run --privileged --name roonserver ...
@@ -92,7 +63,7 @@ Run the Roon container in privileged mode
     # docker-compose.yaml (inside service section):
     privileged: true
 
-Run the Roon container with the right privileges. Some of these are docker-related, but depending on your host distribution and security settings you may need additional privileges.
+Run the Roon Server container with the right privileges. Some of these are docker-related, but depending on your host distribution and security settings you may need additional privileges.
 
     # standalone or from systemd service:
     docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --security-opt apparmor:unconfined ...
