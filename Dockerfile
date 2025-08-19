@@ -1,16 +1,37 @@
-FROM debian:12-slim
-LABEL org.opencontainers.image.authors="steef@debruijn.ws"
+#################################################
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+#############################################
 
-RUN apt-get update \
-        && apt-get -y upgrade \
-        && apt-get -y install bash curl bzip2 ffmpeg cifs-utils alsa-utils libicu72
+# TODO (DANOBLE) Reference SPDX document that references MIT and Roon software terms and conditions.
+# TODO (david-noble) Contact original author about his license and on how to credit/collaborate with him.
+# TODO (david-noble) Ensure that we comply with the OCI Image Format Specification at https://github.com/opencontainers/image-spec.
+# TODO (david-noble) Ensure that the license expression specifies MIT AND the Roon license at https://roon.app/en/termsandconditions.
 
-ENV ROON_SERVER_PKG RoonServer_linuxx64.tar.bz2
-ENV ROON_SERVER_URL https://download.roonlabs.net/builds/${ROON_SERVER_PKG}
-ENV ROON_DATAROOT /data
-ENV ROON_ID_DIR /data
+FROM ubuntu:latest
 
-VOLUME [ "/app", "/data", "/music", "/backup" ]
+LABEL org.opencontainers.image.vendor="Noble Factor"
+LABEL org.opencontainers.image.authors="David-Noble@noblefactor.com"
+LABEL org.opencontainers.image.licenses="MIT AND LicenseRef:Roon-software-terms-and-conditions https://roon.app/en/termsandconditions"
 
-ADD run.sh /
-ENTRYPOINT /run.sh
+ARG prefix=/opt/local
+
+ENV ROON_SERVERROOT=${prefix}/share/roon/roonserver
+ENV ROON_DATAROOT=${prefix/var/roon}
+
+RUN <<EOF
+ln --force --symbolic /usr/share/zoneinfo/Etc/UTC /etc/localtime
+mkdir -p "${ROON_SERVERROOT}"
+apt-get update
+apt-get -y upgrade
+apt-get -y install bash curl bzip2 ffmpeg cifs-utils alsa-utils libicu74
+EOF
+
+ADD deploy-roonserver /
+
+VOLUME [\
+ "${ROON_DATAROOT}/data",\
+ "${ROON_DATAROOT}}/music",\
+ "${ROON_DATAROOT}}/backup" ]
+
+ENTRYPOINT [ "/deploy-roonserver" ]

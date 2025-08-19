@@ -1,0 +1,16 @@
+services:
+  roonservice:
+    image: ${IMAGE:-noblefactor/roonserver}
+    container_name: roonserver
+    platform: linux/amd64
+    hostname: roonserver
+    network_mode: host
+    volumes:
+      - roon-data:${PREFIX:-/opt/local}/var/data
+      - roon-music:${PREFIX:-/opt/local}/var/music
+      - roon-backup:${PREFIX:-/opt/local}/var/backup
+    restart: always
+volumes:
+  roon-data:
+  roon-music:
+  roon-backup:
