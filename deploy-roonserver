@@ -30,9 +30,9 @@ function usage {
     echo "       ${script_name} [--package <address>] [--timezone <>] [--help]"
     echo ""
     echo "DESCRIPTION"
-    echo "       ${script_name} requires root privileges and the systemd system. It is useful for deploying a Roon Server to a dedicated"
-    echo "       Linux machine, and running Roon Server in a Linux container. The first time it runs, Roon Server is installed,"
-    echo "       configured, and started. On subquent runs, it will detect the installation and simply start the service; nothing more."
+    echo "       ${script_name} requires root privileges. It is useful for deploying a Roon Server to a dedicated Linux machine, and"
+    echo "       running Roon Server in a Linux container. The first time it runs, Roon Server is installed, configured, and started."
+    echo "       On subquent runs, it will detect the installation and simply start the service; nothing more."
     echo ""
     echo "       Following deployment on a dedicated Linux machine, manage the Roon Server service with systemctl. Uninstall the Roon" 
     echo "       Server service with \$ROON_SERVERROOT/Uninstall-roonserver."
@@ -184,7 +184,6 @@ while [[ $1 != '--' ]]; do
 done
 
 [[ -n ${package:-} ]] || declare -r package='https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2'
-[[ -n ${prefix:-} ]] || declare -r prefix='/opt/local'
 [[ -n ${timezone:-} ]] || declare -r timezone='Etc/UTC'
 
 ###########
@@ -219,6 +218,8 @@ if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
     echo ""
 
     trap on_error_or_interrupt ERR SIGINT SIGKILL SIGTERM
+    set | grep "^roon_.*"
+    echo ""
 
     if [[ -f /.dockerenv ]]; then
         ln --force --symbolic "/usr/share/zoneinfo/${timezone}" /etc/localtime
@@ -289,7 +290,7 @@ fi
 echo "-------------------------------------"
 echo "S T A R T I N G  R O O N  S E R V E R"
 echo "-------------------------------------"
-echo
+echo ""
 
 if [[ $(systemctl is-enabled "${roon_service_name}") != enabled ]]; then
     note "Enabling ${roon_service_name}"

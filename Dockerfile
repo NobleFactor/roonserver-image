@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.licenses="MIT AND LicenseRef:Roon-software-terms-
 ARG prefix=/opt/local
 
 ENV ROON_SERVERROOT=${prefix}/share/roon/roonserver
-ENV ROON_DATAROOT=${prefix/var/roon}
+ENV ROON_DATAROOT=${prefix}/var/roon
 
 RUN <<EOF
 ln --force --symbolic /usr/share/zoneinfo/Etc/UTC /etc/localtime
@@ -30,8 +30,8 @@ EOF
 ADD deploy-roonserver /
 
 VOLUME [\
+ "${ROON_DATAROOT}/backup",\
  "${ROON_DATAROOT}/data",\
- "${ROON_DATAROOT}}/music",\
- "${ROON_DATAROOT}}/backup" ]
+ "${ROON_DATAROOT}/music" ]
 
 ENTRYPOINT [ "/deploy-roonserver" ]

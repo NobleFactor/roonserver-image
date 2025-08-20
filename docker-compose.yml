@@ -5,12 +5,17 @@ services:
     platform: linux/amd64
     hostname: roonserver
     network_mode: host
-    volumes:
-      - roon-data:${PREFIX:-/opt/local}/var/data
-      - roon-music:${PREFIX:-/opt/local}/var/music
-      - roon-backup:${PREFIX:-/opt/local}/var/backup
     restart: always
+    volumes:
+      - type: volume
+        source: roon-backup
+        target: /opt/local/var/roon/backup
+      - type: volume
+        source: roon-data
+        target: /opt/local/var/roon/data
+      - type: bind
+        source: ~/Music/Music/Media.localized/Music
+        target: /opt/local/var/roon/music
 volumes:
-  roon-data:
-  roon-music:
   roon-backup:
+  roon-data:
