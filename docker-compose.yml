@@ -9,13 +9,10 @@ services:
     volumes:
       - type: bind
         source: ~/Documents/Roon/Backup
-        target: /opt/local/var/roon/backup
+        target: ${ROON_DATAROOT}/backup
       - type: bind
         source: ~/Documents/Roon/Data
-        target: /opt/local/var/roon/data
+        target: ${ROON_DATAROOT}/data
       - type: bind
         source: ~/Documents/Roon/Music
-        target: /opt/local/var/roon/music
-volumes:
-  roon-backup:
-  roon-data:
+        target: ${ROON_DATAROOT}/music
