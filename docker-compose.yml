@@ -7,15 +7,12 @@ services:
     network_mode: host
     restart: always
     volumes:
-      - type: volume
-        source: roon-backup
+      - type: bind
+        source: ~/Documents/Roon/Backup
         target: /opt/local/var/roon/backup
-      - type: volume
-        source: roon-data
+      - type: bind
+        source: ~/Documents/Roon/Data
         target: /opt/local/var/roon/data
       - type: bind
-        source: ~/Music/Music/Media.localized/Music
+        source: ~/Documents/Roon/Music
         target: /opt/local/var/roon/music
-volumes:
-  roon-backup:
-  roon-data:

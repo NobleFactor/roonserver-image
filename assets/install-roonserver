@@ -22,80 +22,82 @@ declare -r script_name="$(basename "$0")"
 
 function usage {
 
-    echo ""
-    echo "NAME"
-    echo "       ${script_name} - installs, configures, and starts Roon Server"
-    echo ""
-    echo "SYNOPSIS"
-    echo "       ${script_name} [--package <address>] [--timezone <>] [--help]"
-    echo ""
-    echo "DESCRIPTION"
-    echo "       ${script_name} requires root privileges. It is useful for deploying a Roon Server to a dedicated Linux machine, and"
-    echo "       running Roon Server in a Linux container. The first time it runs, Roon Server is installed, configured, and started."
-    echo "       On subquent runs, it will detect the installation and simply start the service; nothing more."
-    echo ""
-    echo "       Following deployment on a dedicated Linux machine, manage the Roon Server service with systemctl. Uninstall the Roon" 
-    echo "       Server service with \$ROON_SERVERROOT/Uninstall-roonserver."
-    echo ""
-    echo "       When running Roon Server in a Linux container, care is taken to ensure that no privileged systemctl operations are run."
-    echo "       Following deployment, rely on docker for service management."
-    echo ""
-    echo "DEPLOYMENT PROCESS"
-    echo "       ${script_name} first checks if Roon Server is installed. If it is not installed, it is deployed as follows:"
-    echo ""
-    echo "           1. The localtime is set. The default local time is Etc/UTC. Override this value with the --timezone option."
-    echo ""
-    echo "           2. The Roon Server package for Linux AMD64 is downloaded from the specified package address. The default package"
-    echo "              address is:"
-    echo ""
-    echo "                  https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2"
-    echo ""
-    echo "              Override this value with the --package option."
-    echo ""
-    echo "           3. The Roon Server package is unpacked on ROON_SERVERROOT. The default value for ROON_SERVERROOT is:"
-    echo ""
-    echo "                  /opt/local/share/roon/roonserver"
-    echo ""
-    echo "              Override this value by exporting an alternative value for ROON_SERVERROOT."
-    echo ""
-    echo "           4. A Roon Server unit file is created on:"
-    echo ""
-    echo "                  /opt/local/lib/systemd/system/roonserver.service"
-    echo ""
-    echo "              This value cannnot be overridden."
-    echo ""
-    echo "           5. Creates a symbolic link to the Roon Server unit file on:"
-    echo ""
-    echo "                  /etc/systemd/system/roonserver.service"
-    echo ""
-    echo "              This value cannnot be overridden."
-    echo ""
-    echo "           6. Ensures that the ROON_DATAROOT directory is created and ready for reading/writing. The default ROON_DATAROOT"
-    echo "              value is:"
-    echo ""
-    echo "                 /opt/local/var/roon"
-    echo ""
-    echo "              Override it by exporting an alternative value for ROON_DATAROOT."
-    echo ""
-    echo "           7. Ensures that the data, music, and backup are created and ready for reading/writing on ROON_DATAROOT."
-    echo ""
-    echo "              The data, music, and backup directory locations cannot be overridden. Use these directories as mount points or"
-    echo "              create symbolic links at these locations, if the data should be stored elsewhere."
-    echo ""
-    echo "       Following deployment, ${script_name} enables and starts the Roon Server service."
-    echo ""
-    echo "OPTIONS"
-    echo "       -h|--help"
-    echo "           Prints this usage text and exits."
-    echo ""
-    echo "       --package"
-    echo "           Download address. Common addresses are file, ftp, and http locations."
-    echo "           Default: https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2"
-    echo ""
-    echo "       --timezone"
-    echo "           Specifies the timezone for containers."
-    echo "           Default: Etc/UTC"
-    echo ""
+    cat 1>&2 <<EOF
+
+NAME
+       ${script_name} - installs, configures, and starts Roon Server
+
+SYNOPSIS
+       ${script_name} [--package <address>] [--timezone <>] [--help]
+
+DESCRIPTION
+       ${script_name} requires root privileges. It is useful for deploying a Roon Server to a dedicated Linux machine, and
+       running Roon Server in a Linux container. The first time it runs, Roon Server is installed, configured, and started.
+       On subquent runs, it will detect the installation and simply start the service; nothing more.
+
+       Following deployment on a dedicated Linux machine, manage the Roon Server service with systemctl. Uninstall the Roon 
+       Server service with \$ROON_SERVERROOT/Uninstall-roonserver.
+
+       When running Roon Server in a Linux container, care is taken to ensure that no privileged systemctl operations are run.
+       Following deployment, rely on docker for service management.
+
+DEPLOYMENT PROCESS
+       ${script_name} first checks if Roon Server is installed. If it is not installed, it is deployed as follows:
+
+           1. The localtime is set. The default local time is Etc/UTC. Override this value with the --timezone option.
+
+           2. The Roon Server package for Linux AMD64 is downloaded from the specified package address. The default package
+              address is:
+
+                  https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2
+
+              Override this value with the --package option.
+
+           3. The Roon Server package is unpacked on ROON_SERVERROOT. The default value for ROON_SERVERROOT is:
+
+                  /opt/local/share/roon/roonserver
+
+              Override this value by exporting an alternative value for ROON_SERVERROOT.
+
+           4. A Roon Server unit file is created on:
+
+                  /opt/local/lib/systemd/system/roonserver.service
+
+              This value cannnot be overridden.
+
+           5. Creates a symbolic link to the Roon Server unit file on:
+
+                  /etc/systemd/system/roonserver.service
+
+              This value cannnot be overridden.
+
+           6. Ensures that the ROON_DATAROOT directory is created and ready for reading/writing. The default ROON_DATAROOT
+              value is:
+
+                 /opt/local/var/roon
+
+              Override it by exporting an alternative value for ROON_DATAROOT.
+
+           7. Ensures that the data, music, and backup are created and ready for reading/writing on ROON_DATAROOT.
+
+              The data, music, and backup directory locations cannot be overridden. Use these directories as mount points or
+              create symbolic links at these locations, if the data should be stored elsewhere.
+
+       Following deployment, ${script_name} enables and starts the Roon Server service.
+
+OPTIONS
+       -h|--help
+           Prints this usage text and exits.
+
+       --package
+           Download address. Common addresses are file, ftp, and http locations.
+           Default: https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2
+
+       --timezone
+           Specifies the timezone for containers.
+           Default: Etc/UTC
+
+EOF
     exit 0
 }
 
@@ -151,8 +153,8 @@ if [[ $arch != x86_64 ]]; then
     error 1 "Requires x86_64, not $arch."
 fi
 
-if ! which systemctl >/dev/null || [[ ! -d /etc/systemd/system ]]; then
-    error 1 "Requires systemctl on PATH."
+if ! (which systemctl > /dev/null && [[ -d /etc/systemd/system ]]); then
+    error 1 "Requires systemd service manager."
 fi
 
 ###########
@@ -202,9 +204,9 @@ declare -r roon_backup_location="${roon_dataroot}/backup"
 declare -r roon_service_name="${roon_server_name}.service"
 declare -r roon_service_path="${roon_systemroot}/${roon_service_name}"
 
-######
+###########
 # Main
-######
+###########
 
 # Install and configure roonserver if systemctl tells us that the roonserver.service unit is absent
 
