@@ -22,16 +22,19 @@ ENV ROON_DATAROOT=${prefix}/var/roon
 RUN <<EOF
 ln --force --symbolic /usr/share/zoneinfo/Etc/UTC /etc/localtime
 mkdir -p "${ROON_SERVERROOT}"
-apt-get update
-apt-get -y upgrade
-apt-get -y install bash curl bzip2 ffmpeg cifs-utils alsa-utils libicu74
+
+apt-get --yes update
+apt-get --yes upgrade
+apt-get --yes install bash bzip2 curl ffmpeg cifs-utils alsa-utils libicu74
+apt-get --yes autoremove
+apt-get --yes clean
 EOF
 
-ADD deploy-roonserver /
+ADD assets/install-roonserver /
 
 VOLUME [\
  "${ROON_DATAROOT}/backup",\
  "${ROON_DATAROOT}/data",\
  "${ROON_DATAROOT}/music" ]
 
-ENTRYPOINT [ "/deploy-roonserver" ]
+ENTRYPOINT [ "/install-roonserver" ]

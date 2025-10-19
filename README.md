@@ -1,9 +1,9 @@
-# Roon Server Image
+# [Roon Server Image](https://github.com/NobleFactor/roonserver-image)
 A Docker image that installs and configures a Roon server the first time you run it as a container.
 
-Example start:
+A Docker image that automatically installs, configures, and runs Roon Server in a container. The installation and configuration is handled by the `install-roonserver` script on first run.
 
-    docker run -d \
+## Quick Start
       --net=host \
       -e TZ="America/Los_Angeles" \
       -v roon-app:/app \
@@ -18,55 +18,133 @@ Example start:
     The app will not start if they both point to the same folder or volume on your host.
   * You should set up your library root to `/music` and configure backups to `/backup` on first run.
 
-## Systemd
+### Using Make (Recommended)
 
-You must use a systemd service to start the Roon Server.
+```bash
+# View all available commands
+make help
 
-## Docker-compose
+# Build and create the Roon Server container
+make New-RoonServer
 
-If you deploy in a `docker-compose` environment, create a `docker-compose.yaml` file and run `docker-compose run <service>`.
+# Start the Roon Server
+make Start-RoonServer
+```
 
-Example `docker-compose.yaml` (adapt to your environment):
+### Using Docker Compose
 
-    version: "3.7"
-    services:
-      docker-roonserver:
-        image: steefdebruijn/docker-roonserver:latest
-        container_name: docker-roonserver
-        hostname: docker-roonserver
-        network_mode: host
-        environment:
-          TZ: "America/Los_Angeles"
-        volumes:
-          - roon-app:/app
-          - roon-data:/data
-          - roon-music:/music
-          - roon-backups:/backup
-        restart: always
+```bash
+# Create and start the container
+docker compose up -d
+
+# View logs
+docker compose logs -f
+```
+
+### Using Docker CLI
+
+```bash
+docker run -d \
+  --name roonserver \
+  --net=host \
+  -v ~/Documents/Roon/Backup:/opt/local/var/roon/backup \
+  -v ~/Documents/Roon/Data:/opt/local/var/roon/data \
+  -v ~/Documents/Roon/Music:/opt/local/var/roon/music \
+  noblefactor/roonserver:latest
+```
+
+## macOS Notes
+
+- This Roon server container was developed and tested on macOS using [OrbStack](https://orbstack.dev/) as a drop-in replacement for Docker Desktop.
+- On macOS, it is best to test from a remote device (e.g., an iPad) using the [Roon Remote app](https://apps.apple.com/us/app/roon-remote/id1014764083) (available in the App Store). This avoids conflicts between the containerized Roon server and Roon for Mac running on the same machine.
+- On first execution, you will asked to authorize Roon Server access to the Roon backup, data, and music volumes. These are currently hardwired to:
+  - ~/Documents/Roon/Backup
+  - ~/Documents/Roon/Data
+  - ~/Documents/Roon/Music/
+
+  See [`docker-compose.yml`](./docker-compose.yml).
+
+## Architecture
+
+This project uses a custom installation script that:
+
+1. **Detects Installation State**: Checks if Roon Server is already installed
+2. **First Run**: Downloads and installs Roon Server from official sources
+3. **Subsequent Runs**: Simply starts the existing installation
+4. **Container-Aware**: Automatically detects Docker environments and skips privileged systemctl operations
+
+### Directory Structure
+
+- **ROON_SERVERROOT**: `/opt/local/share/roon/roonserver` - Roon Server application files
+- **ROON_DATAROOT**: `/opt/local/var/roon` - Roon Server data root
+  - `/opt/local/var/roon/data` - Database and configuration
+  - `/opt/local/var/roon/music` - Music library
+  - `/opt/local/var/roon/backup` - Backup location
+
+**Important**: The server and data directories must be separate. The installation script enforces this to prevent update issues.
+
+## Configuration
+
+### Environment Variables
+
+- **ROON_SERVERROOT**: Override default server installation path (default: `/opt/local/share/roon/roonserver`)
+- **ROON_DATAROOT**: Override default data root path (default: `/opt/local/var/roon`)
+
+### Install Script Options
+
+The `install-roonserver` script supports:
+
+- `--package <address>`: Custom download URL for Roon Server package (default: official Roon Labs URL)
+- `--timezone <timezone>`: Set container timezone (default: `Etc/UTC`)
+- `--help`: Display usage information
+
+## Docker Compose Configuration
+
+The included `docker-compose.yml` provides a complete configuration:
+
+```yaml
+services:
+  roonservice:
+    image: ${IMAGE:-noblefactor/roonserver}
+    container_name: roonserver
+    platform: linux/amd64
+    hostname: roonserver
+    network_mode: host
+    restart: always
     volumes:
-      roon-app:
-      roon-data:
-      roon-music:
-      roon-backups:
+      - type: bind
+        source: ~/Documents/Roon/Backup
+        target: /opt/local/var/roon/backup
+      - type: bind
+        source: ~/Documents/Roon/Data
+        target: /opt/local/var/roon/data
+      - type: bind
+        source: ~/Documents/Roon/Music
+        target: /opt/local/var/roon/music
+```
 
+**Customize the volume paths** to match your environment.
 
-## Network shares
+## Network Shares
 
-If you find yourself in trouble using remote SMB/CIFS shares, you probably need some additional privileges on the container.
+If you encounter issues using remote SMB/CIFS shares, you may need additional container privileges.
 You have two options here (see also issue #15):
 
-Run the Roon Server container in privileged mode
+### Option 1: Privileged Mode
 
-    # standalone or from systemd service:
-    docker run --privileged --name roonserver ...
+```bash
+# Docker CLI
+docker run --privileged --name roonserver ...
 
-    # docker-compose.yaml (inside service section):
-    privileged: true
+# docker-compose.yml
+privileged: true
+```
 
-Run the Roon Server container with the right privileges. Some of these are docker-related, but depending on your host distribution and security settings you may need additional privileges.
+### Option 2: Specific Capabilities
 
-    # standalone or from systemd service:
-    docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --security-opt apparmor:unconfined ...
+```bash
+# Docker CLI
+docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --security-opt apparmor:unconfined ...
     
     # docker-compose.yaml (inside service section):
     cap_add:
@@ -75,39 +153,88 @@ Run the Roon Server container with the right privileges. Some of these are docke
     security_opt:
       - apparmor:unconfined
 
+# docker-compose.yml
+cap_add:
+  - SYS_ADMIN
+  - DAC_READ_SEARCH
+security_opt:
+  - apparmor:unconfined
+```
 
-## Network issues
+## Network Configuration
 
-If your docker host has multiple networks attached and your core has trouble finding audio sinks/endpoints, you can try using a specific docker network setup as described in issue #1:
+If your Docker host has multiple networks and your core has trouble finding audio endpoints, try using a macvlan network:
 
-    docker network create -d macvlan \
-       --subnet 192.168.1.0/24 --gateway 192.168.1.1 \
-       --ip-range 192.168.1.240/28 -o parent=enp4s0 roon-lan
-    docker run --network roon-lan --name roonserver ...
+```bash
+docker network create -d macvlan \
+   --subnet 192.168.1.0/24 --gateway 192.168.1.1 \
+   --ip-range 192.168.1.240/28 -o parent=enp4s0 roon-lan
 
-  Use the subnet and corresponding gateway that your audio sinks/endpoints are connected to. Use an ip-range for docker that is not conflicting with other devices on your network and outside of the DHCP range on that subnet if applicable.
+docker run --network roon-lan --name roonserver ...
+```
+
+Use the subnet and gateway that match your audio endpoints. Choose an IP range that doesn't conflict with DHCP or other devices.
 
 ## Extensions
 
-If you would like to use the Roon extensions, please deploy a separate docker container for the extension manager, for example [this one](https://hub.docker.com/r/theappgineer/roon-extension-manager).
+For Roon extensions, deploy a separate container for the extension manager, such as [theappgineer/roon-extension-manager](https://hub.docker.com/r/theappgineer/roon-extension-manager).
 I have not tried this myself, I do not use Roon extensions.
 
 ## Backups
 
-  Don't forget to backup the `roon-backups` *for real* (offsite preferably).
+**Important**: Always maintain offsite backups of your `/opt/local/var/roon/backup` volume.
 
-  Have fun!
+## Development
+
+### Building the Image
+
+```bash
+make New-RoonServer
+```
+
+Or manually:
+
+```bash
+docker buildx build --platform linux/amd64 --tag noblefactor/roonserver:1.0.0-preview.2 . --progress=plain
+```
+
+### Shell Access
+
+```bash
+make Start-RoonServerShell
+```
+
+Or manually:
+
+```bash
+docker exec -it roonserver /bin/bash
+```
+
+## License
+
+Copyright (c) 2024 Noble Factor
+
+This project is licensed under the MIT License. Roon Server software is subject to [Roon Labs Terms and Conditions](https://roon.app/en/termsandconditions).
+
+## Support
+
+For issues related to:
+
+- **This Docker image**: Open an issue in this repository
   
-  Steef
+- **Roon Server**: Visit [Roon Labs Support](https://roon.app/support)
 
-## Version history
+## Version History
 
-  * 2023-11-03: update base image to 'debian:12-slim', dependency to libicu72
-  * 2022-04-12: update base image to 'debian:11-slim'
-  * 2022-03-19: Fix download URL, follow redirects on download. Added specific usage scenarios in README.
-  * 2021-05-24: update base image to `debian:10.9-slim` and check for shared `/app` and `/data` folders.
-  * 2019-03-18: Fix example start (thanx @heapxor); add `systemd` example.
-  * 2019-01-23: updated base image to `debian-9.6`
-  * 2017-08-08: created initial images based on discussion on roonlabs forum
+- 2024-10-19: Updated to Ubuntu base image, refactored installation scripts, added Make targets
+- 2023-11-03: Updated base image to 'debian:12-slim', dependency to libicu72
+- 2022-04-12: Updated base image to 'debian:11-slim'
+- 2022-03-19: Fixed download URL, follow redirects on download. Added specific usage scenarios in README
+- 2021-05-24: Updated base image to `debian:10.9-slim` and check for shared `/app` and `/data` folders
+- 2019-03-18: Fixed example start; added `systemd` example
+- 2019-01-23: Updated base image to `debian-9.6`
+- 2017-08-08: Created initial images based on discussion on Roon Labs forum
 
+## Acknowledgments
 
+This project builds upon earlier work by Steef de Bruijn and the Roon Labs community.

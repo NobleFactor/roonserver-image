@@ -1,0 +1,311 @@
+#!/bin/bash
+
+#################################################
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+#############################################
+
+# TODO (DANOBLE) Reference SPDX document that references MIT and Roon software terms and conditions.
+
+set -o errexit -o nounset
+
+###########
+# Variables
+###########
+
+declare -r script_root="$(cd "$(dirname "$0")" && pwd)"
+declare -r script_name="$(basename "$0")"
+
+###########
+# Functions
+###########
+
+function usage {
+
+    cat 1>&2 <<EOF
+
+NAME
+       ${script_name} - installs, configures, and starts Roon Server
+
+SYNOPSIS
+       ${script_name} [--package <address>] [--timezone <>] [--help]
+
+DESCRIPTION
+       ${script_name} requires root privileges. It is useful for deploying a Roon Server to a dedicated Linux machine, and
+       running Roon Server in a Linux container. The first time it runs, Roon Server is installed, configured, and started.
+       On subquent runs, it will detect the installation and simply start the service; nothing more.
+
+       Following deployment on a dedicated Linux machine, manage the Roon Server service with systemctl. Uninstall the Roon 
+       Server service with \$ROON_SERVERROOT/Uninstall-roonserver.
+
+       When running Roon Server in a Linux container, care is taken to ensure that no privileged systemctl operations are run.
+       Following deployment, rely on docker for service management.
+
+DEPLOYMENT PROCESS
+       ${script_name} first checks if Roon Server is installed. If it is not installed, it is deployed as follows:
+
+           1. The localtime is set. The default local time is Etc/UTC. Override this value with the --timezone option.
+
+           2. The Roon Server package for Linux AMD64 is downloaded from the specified package address. The default package
+              address is:
+
+                  https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2
+
+              Override this value with the --package option.
+
+           3. The Roon Server package is unpacked on ROON_SERVERROOT. The default value for ROON_SERVERROOT is:
+
+                  /opt/local/share/roon/roonserver
+
+              Override this value by exporting an alternative value for ROON_SERVERROOT.
+
+           4. A Roon Server unit file is created on:
+
+                  /opt/local/lib/systemd/system/roonserver.service
+
+              This value cannnot be overridden.
+
+           5. Creates a symbolic link to the Roon Server unit file on:
+
+                  /etc/systemd/system/roonserver.service
+
+              This value cannnot be overridden.
+
+           6. Ensures that the ROON_DATAROOT directory is created and ready for reading/writing. The default ROON_DATAROOT
+              value is:
+
+                 /opt/local/var/roon
+
+              Override it by exporting an alternative value for ROON_DATAROOT.
+
+           7. Ensures that the data, music, and backup are created and ready for reading/writing on ROON_DATAROOT.
+
+              The data, music, and backup directory locations cannot be overridden. Use these directories as mount points or
+              create symbolic links at these locations, if the data should be stored elsewhere.
+
+       Following deployment, ${script_name} enables and starts the Roon Server service.
+
+OPTIONS
+       -h|--help
+           Prints this usage text and exits.
+
+       --package
+           Download address. Common addresses are file, ftp, and http locations.
+           Default: https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2
+
+       --timezone
+           Specifies the timezone for containers.
+           Default: Etc/UTC
+
+EOF
+    exit 0
+}
+
+function new_targetdirectory {
+    
+    local -r description="$1" target_directory="$2"
+    
+    if mkdir -p $target_directory 2> /dev/null && [[ -r $target_directory ]] && [[ -w $target_directory ]]; then
+        note "${description} directory is on '$roon_serverroot'"
+    else
+        error 1 "Failed to create r/w ${description} directory: '$target_directory'"
+    fi
+}
+
+function error {
+    local exit_code=$1 && shift 1
+    echo "[$(date --iso-8601=seconds)] ${script_name} error: $@" 1>&2
+    exit $exit_code
+}
+
+function note {
+    echo "[$(date --iso-8601=seconds)] ${script_name} note: $@"
+}
+
+function on_error_or_interrupt {
+    
+    local -r service_unit_filename=/etc/systemd/system/${roon_service_name}
+    local -r real_service_unit_filename=$(readlink --canonicalize-missing ${service_unit_filename})
+
+    systemctl stop "$roon_server_name" 2>&1 > /dev/null | true
+    
+    rm -rf \
+        "$roon_serverroot" \
+        "$roon_service_path" \
+        "$roon_dataroot/*" \
+        "$service_unit_filename" \
+        "$real_service_unit_filename" | true
+
+    ln --force --symbolic ${previous_localtime} /etc/localtime
+}
+
+###################
+# Prerequsite check
+###################
+
+declare arch=$(uname -m)
+
+if [[ $EUID -ne 0 ]]; then
+    error 1 "Must run as root."
+fi
+
+if [[ $arch != x86_64 ]]; then
+    error 1 "Requires x86_64, not $arch."
+fi
+
+if ! (which systemctl > /dev/null && [[ -d /etc/systemd/system ]]); then
+    error 1 "Requires systemd service manager."
+fi
+
+###########
+# Arguments
+###########
+
+declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,package:,timezone:" -- $* || echo exit)
+eval set -- "$args"
+
+while [[ $1 != '--' ]]; do
+    case $1 in
+    -h|--help)
+        usage; # does not return
+        shift 1
+        ;;
+    --package)
+        declare -r package="$2"
+        shift 2
+        ;;
+    --timezone)
+        declare -r timezone="$2"
+        shift 2
+        ;;
+    *)
+        error 1 "Unrecognized option: $1"
+        ;;
+  esac
+
+done
+
+[[ -n ${package:-} ]] || declare -r package='https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2'
+[[ -n ${timezone:-} ]] || declare -r timezone='Etc/UTC'
+
+###########
+# Constants
+###########
+
+declare -r roon_serverroot="${ROON_SERVERROOT:-/opt/local/share/roon/roonserver}"
+declare -r roon_dataroot="${ROON_DATAROOT:-/opt/local/var/roon}"
+declare -r roon_approot="$(dirname "${roon_serverroot}")"
+declare -r roon_systemroot="/opt/local/lib/systemd/system"
+
+declare -r roon_server_name="$(basename "$roon_serverroot")"
+declare -r roon_music_location="${roon_dataroot}/music"
+declare -r roon_backup_location="${roon_dataroot}/backup"
+
+declare -r roon_service_name="${roon_server_name}.service"
+declare -r roon_service_path="${roon_systemroot}/${roon_service_name}"
+
+###########
+# Main
+###########
+
+# Install and configure roonserver if systemctl tells us that the roonserver.service unit is absent
+
+if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
+
+    declare -r previous_localtime=$(readlink /etc/localtime)
+
+    echo "-----------------------------------------"
+    echo "I N S T A L L I N G  R O O N  S E R V E R"
+    echo "-----------------------------------------"
+    echo ""
+
+    trap on_error_or_interrupt ERR SIGINT SIGKILL SIGTERM
+    set | grep "^roon_.*"
+    echo ""
+
+    if [[ -f /.dockerenv ]]; then
+        ln --force --symbolic "/usr/share/zoneinfo/${timezone}" /etc/localtime
+    else
+        timedatectl set-timezone "${timezone}" 2> /dev/null
+    fi
+
+    # Setup directory structure
+    
+    new_targetdirectory 'Roon Server' $roon_serverroot
+    new_targetdirectory 'Roon Server data' $roon_dataroot/data
+    new_targetdirectory 'Roon Server service unit file' $roon_systemroot
+    new_targetdirectory 'Roon music' $roon_music_location
+    new_targetdirectory 'Roon backup' $roon_backup_location
+
+    # Verify that the Roon Server directory and the Roon data directory aren't the same
+    # Rationale: This causes difficult update issues.
+
+    rm -f $roon_dataroot/check-for-common-target-directory
+    touch $roon_serverroot/check-for-common-target-directory
+
+    if [[ -f $roon_dataroot/check-for-shared-with-data ]]; then
+
+        target="$(readlink --canonicalize-existing "${roon_dataroot}")"
+        
+        error 1 "Roon data and server directories cannot refer to the same location as this causes difficult update" \
+            "issues. Address the problem segregating these directories:" \
+            "$(find "$(findmnt -o TARGET -cenT "$target")" -mount -samefile "$target")"
+    fi
+
+    note "Downloading and unpacking Roon Server from '${package}' to '${roon_serverroot}'"
+
+    cd "${roon_approot}"
+    rm -rf "${roon_server_name}"/*
+    curl --location "${package}" --output "${package##*/}" --progress-bar
+    tar -xjf "${package##*/}" --directory ${roon_server_name} --strip-components=1
+
+    # Check installation and clean up
+
+    [[ -f "${roon_server_name}/check.sh" ]] || error 1 "Cannot check installation because '${roon_server_name}/check.sh' is missing."
+    "${roon_server_name}/check.sh"
+    rm -f "${package##*/}"
+
+    # Create service unit
+
+    cat > "${roon_service_path}" << END_SERVICE_UNIT
+[Unit]
+Description=${roon_server_name}
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=ROON_SERVERROOT="${roon_serverroot}"
+Environment=ROON_DATAROOT="${roon_dataroot}/data"
+Environment=ROON_ID_DIR="${roon_dataroot}/data"
+ExecStart="${roon_serverroot}/start.sh"
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+END_SERVICE_UNIT
+
+    ln --force --symbolic "${roon_service_path}" "/etc/systemd/system/${roon_service_name}"
+    trap - ERR SIGINT SIGKILL SIGTERM
+fi
+
+echo "-------------------------------------"
+echo "S T A R T I N G  R O O N  S E R V E R"
+echo "-------------------------------------"
+echo ""
+
+if [[ $(systemctl is-enabled "${roon_service_name}") != enabled ]]; then
+    note "Enabling ${roon_service_name}"
+    systemctl enable "${roon_service_name}"
+fi
+
+if [[ -f /.dockerenv ]]; then
+    note "Invoking ${roon_serverroot}/start.sh"
+    export ROON_SERVERROOT="${roon_serverroot}"
+    export ROON_DATAROOT="${roon_dataroot}/data"
+    export ROON_ID_DIR="${roon_dataroot}/data"
+    "${roon_serverroot}/start.sh"
+else
+    systemctl start "${roon_service_name}"
+    systemctl status "${roon_service_name}"
+fi
