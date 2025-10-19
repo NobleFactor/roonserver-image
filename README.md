@@ -99,7 +99,7 @@ Reference: https://portforward.com/roon/.
 
 - If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live.
 
-- Macvlan networks are only supported on Linux so the macvlan option is unavailable on macOS and Windows.
+- macvlan networks are only supported on Linux, so the macvlan option is unavailable on macOS and Windows.
 
 ## Make Targets
 
