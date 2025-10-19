@@ -95,7 +95,7 @@ Important: App and data locations must be different to ensure smooth upgrades. T
 - These incoming ports must be open to network traffic:
     * TCP: 9100-9200
     * UDP: 9003
-Reference: https://portforward.com/roon/.
+Reference: [Roon port forwarding](https://portforward.com/roon/).
 
 - If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live.
 
