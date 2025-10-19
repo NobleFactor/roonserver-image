@@ -46,7 +46,8 @@ docker run -d \
 - On first execution, you will asked to authorize Roon Server access to the Roon backup, data, and music volumes. These are currently hardwired to:
   - ~/Documents/Roon/Backup
   - ~/Documents/Roon/Data
-  - ~/Documents/Roon/Music
+  - ~/Documents/Roon/Music/
+
   See [`docker-compose.yml`](./docker-compose.yml).
 
 ## Architecture
