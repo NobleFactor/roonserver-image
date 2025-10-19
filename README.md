@@ -91,7 +91,6 @@ Important: App and data locations must be different to ensure smooth upgrades. T
 ## Networking
 
 - The container uses `network_mode: host` to allow Roon discovery and audio endpoints.
-  
 - If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live. Macvlan networks are not supported on macOS.
 
 ## Make Targets
