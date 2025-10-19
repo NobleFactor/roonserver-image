@@ -91,8 +91,15 @@ Important: App and data locations must be different to ensure smooth upgrades. T
 ## Networking
 
 - The container uses `network_mode: host` to allow Roon discovery and audio endpoints.
-  
-- If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live. Macvlan networks are only supported on Linux so this option is unavailable on macOS or Windows.
+
+- These incoming ports must be open to network traffic:
+    * TCP: 9100-9200
+    * UDP: 9003
+Reference: https://portforward.com/roon/.
+
+- If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live.
+
+- Macvlan networks are only supported on Linux so the macvlan option is unavailable on macOS and Windows.
 
 ## Make Targets
 
