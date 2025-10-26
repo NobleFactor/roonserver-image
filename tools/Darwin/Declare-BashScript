@@ -1,0 +1,62 @@
+# Source this file as follows: 
+#   source Declare-BashScript <script_path> <long-options> <short-options>
+# Example: 
+#   source Declare-BashScript $0 "help,verbose,path:," "hvp" "$@"
+
+set -o errexit -o nounset -o pipefail
+
+###########
+# Variables
+###########
+
+declare -r script_root="$(cd "$(dirname "$1")" && pwd)"
+declare -r script_name="$(basename "$1")"
+declare -r script_long_options="${2:-}"
+declare -r script_options="${3:-}"
+
+shift 3 || shift 2 || shift 1 ;# Shift past the first three arguments to leave only the options for parsing
+
+###########
+# Functions
+###########
+
+function usage {
+    man $(man -w "${script_name}" 1>/dev/null 2>&1 || echo "-M '${script_root}/man'") "${script_name}"
+    exit 0
+}
+
+function error {
+    local rc=$1
+    shift 1
+    echo "[$(date --iso-8601=seconds)] ${script_name} error: ❌ $@" 1>&2
+    exit $rc
+}
+
+function note {
+    echo "[$(date --iso-8601=seconds)] ${script_name} note: $@" 1>&2
+}
+
+function success {
+    echo "[$(date --iso-8601=seconds)] ${script_name} success: ✅ $@" 1>&2
+}
+
+###########
+# Constants
+###########
+
+# useful for printing text to console...
+
+declare -r b="$(tput bold)"  ; # bold
+declare -r n="$(tput sgr0)"  ; # normal
+declare -r u="$(tput smul)"  ; # underline
+declare -r u_="$(tput rmul)" ; # underline off (neither $n nor $b defeat $u)
+
+###########
+# Arguments
+###########
+
+declare -r script_arguments=$(getopt -n "${script_name}" -o "$script_options" --long "$script_long_options" -- "$@")
+
+if [ $? -ne 0 ]; then
+    error 1 "Unable to parse arguments: $arguments"
+fi

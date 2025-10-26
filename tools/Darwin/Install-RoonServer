@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Install-RoonServer - Install and configure Roon Server as a system-wide macOS LaunchDaemon
 #
