@@ -1,0 +1,46 @@
+# Bash completion for Install-RoonServer
+#
+# Copyright (c) 2024 Noble Factor
+# MIT License - See LICENSE.md for full license text
+#
+# Source this file or place it in /etc/bash_completion.d/ or /usr/local/etc/bash_completion.d/
+
+_Install_RoonServer() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    
+    # All available options
+    opts="-h --help --roon-dataprefix --roon-user"
+    
+    # Handle option-specific completions
+    case "${prev}" in
+        --roon-dataprefix)
+            # Directory completion (no space after directories)
+            COMPREPLY=( $(compgen -d -- "${cur}") )
+            compopt -o nospace 2>/dev/null
+            return 0
+            ;;
+        --roon-user)
+            # User completion
+            COMPREPLY=( $(compgen -u -- "${cur}") )
+            return 0
+            ;;
+        -h|--help)
+            # No further completion after help
+            return 0
+            ;;
+    esac
+    
+    # Complete with available options if current word starts with -
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+        return 0
+    fi
+    
+    return 0
+}
+
+# Register the completion function
+complete -F _Install_RoonServer Install-RoonServer

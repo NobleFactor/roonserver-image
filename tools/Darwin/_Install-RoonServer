@@ -1,0 +1,28 @@
+#compdef Install-RoonServer
+# Zsh completion for Install-RoonServer
+#
+# Copyright (c) 2024 Noble Factor
+# MIT License - See LICENSE.md for full license text
+#
+# Place this file in a directory in your $fpath, typically:
+# - /usr/local/share/zsh/site-functions/_Install-RoonServer
+# - ~/.zsh/completion/_Install-RoonServer
+# Then run: compinit
+
+_Install-RoonServer() {
+    local -a args
+    
+    args=(
+        '(- *)'{-h,--help}'[Display usage information and exit]'
+        '--roon-dataprefix[Specify directory prefix for Roon data storage]:directory:_directories'
+        '--roon-user[Specify username for RoonServer daemon]:username:_users'
+    )
+    
+    _arguments -s -S $args
+}
+
+# Register the completion function
+_Install-RoonServer "$@"
+
+# Also provide completion for the script when run from current directory
+compdef _install-roonserver ./Install-RoonServer

@@ -6,7 +6,7 @@ This image is intended for local use and was developed and tested primarily on m
 
 ## Features
 
-- Automatic first-run installation using `assets/install-roonserver`
+- Automatic first-run installation using `assets/Install-RoonServer`
 - Clean separation of app and data locations
 - Docker Compose and Makefile workflows
 - macOS-friendly defaults and guidance
@@ -62,6 +62,10 @@ docker run -d \
 
   See `docker-compose.yml` to change these.
 
+### Reference
+
+1. [OrbStack Host Networking](https://docs.orbstack.dev/docker/host-networking)
+
 ## Configuration
 
 Environment variables used by the installer and service:
@@ -93,8 +97,8 @@ Important: App and data locations must be different to ensure smooth upgrades. T
 - The container uses `network_mode: host` to allow Roon discovery and audio endpoints.
 
 - These incoming ports must be open to network traffic:
-    * TCP: 9100-9200
-    * UDP: 9003
+  - TCP: 9100-9200
+  - UDP: 9003
 Reference: [Roon port forwarding](https://portforward.com/roon/).
 
 - If you are on Linux and your host has multiple networks, endpoints may not be discovered. In this case, consider using a macvlan network and attach the container to the LAN where endpoints live.
@@ -112,7 +116,7 @@ Reference: [Roon port forwarding](https://portforward.com/roon/).
 
 ## How It Works
 
-On first start, the entrypoint runs `assets/install-roonserver` which:
+On first start, the entrypoint runs `assets/Install-RoonServer` which:
 
 1. Verifies prerequisites and sets timezone
 2. Downloads and unpacks Roon Server into `ROON_SERVERROOT`

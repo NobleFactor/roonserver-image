@@ -1,0 +1,133 @@
+.TH INSTALL-ROONSERVER 1 "October 2025" "RoonServer Image Tools" "User Commands"
+.\" Copyright (c) 2024 Noble Factor
+.\" MIT License - See LICENSE.md for full license text
+.SH NAME
+Install-RoonServer \- Install and configure Roon Server as a macOS LaunchDaemon
+.SH SYNOPSIS
+.B Install-RoonServer
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B Install-RoonServer
+downloads, installs, and configures Roon Server as a system-wide LaunchDaemon on macOS.
+It sets up the necessary directories, permissions, and environment variables for Roon Server
+to run automatically at system startup.
+.PP
+The script must be run with root privileges (using
+.BR sudo ).
+.PP
+After installation, you must grant local area network access to Roon Server through the macOS GUI.
+This cannot be done from the terminal. Go to System Settings > Privacy & Security > Local Network,
+find Roon Server in the list, and toggle the switch to allow network access.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display usage information and exit.
+.TP
+.BR \-\-roon\-dataprefix " \fIPATH\fR"
+Specify the directory prefix for Roon data storage. The actual data will be stored in
+.IR PATH /Data.
+Defaults to
+.I ~/Documents/Roon
+(where ~ is the home directory of the user invoking sudo).
+.TP
+.BR \-\-roon\-user " \fIUSERNAME\fR"
+Specify the username under which the RoonServer daemon will run.
+Defaults to
+.B $SUDO_USER
+(the user who invoked sudo).
+.SH EXAMPLES
+Install with default settings:
+.PP
+.nf
+.RS
+sudo Install-RoonServer
+.RE
+.fi
+.PP
+Install with custom data directory:
+.PP
+.nf
+.RS
+sudo Install-RoonServer --roon-dataprefix /Volumes/Storage/Roon
+.RE
+.fi
+.PP
+Install with custom user and data directory:
+.PP
+.nf
+.RS
+sudo Install-RoonServer --roon-user roonuser --roon-dataprefix /opt/roon
+.RE
+.fi
+.SH FILES
+.TP
+.I /Library/LaunchDaemons/com.noblefactor.roon.RoonServer.plist
+The LaunchDaemon configuration file that controls how RoonServer runs at system startup.
+.TP
+.I /Applications/Roon.app
+The installed Roon application containing the RoonServer executable.
+.TP
+.I /var/log/roon/
+Directory containing RoonServer log files:
+.RS
+.TP
+.I RoonServer.out
+Standard output from the RoonServer daemon.
+.TP
+.I RoonServer.err
+Standard error output from the RoonServer daemon.
+.RE
+.SH ENVIRONMENT
+.TP
+.B SUDO_USER
+The username of the user who invoked sudo. Used as the default for
+.BR \-\-roon\-user .
+.SH EXIT STATUS
+.TP
+.B 0
+Success. RoonServer was installed and started successfully.
+.TP
+.B 1
+Error occurred. This may be due to insufficient privileges, download failure,
+installation failure, or daemon startup failure.
+.SH DIAGNOSTICS
+If RoonServer fails to start, check the following:
+.IP \(bu 2
+Verify that the installation was run with
+.B sudo
+(root privileges)
+.IP \(bu 2
+Check the log files in
+.I /var/log/roon/
+for error messages
+.IP \(bu 2
+Verify that local area network access has been granted in System Settings
+.IP \(bu 2
+Ensure the specified data directory is accessible by the specified user
+.IP \(bu 2
+Check launchd status with:
+.BR "launchctl print system/com.noblefactor.roon.RoonServer"
+.SH NOTES
+.IP \(bu 2
+The script downloads the latest version of Roon from
+.I https://download.roonlabs.net/builds/Roon.dmg
+.IP \(bu 2
+Any existing
+.I /Applications/Roon.app
+will be replaced
+.IP \(bu 2
+The RoonServer daemon is configured to start automatically at boot and restart if it crashes
+.IP \(bu 2
+The daemon runs under the specified user account, not root
+.SH BUGS
+Report bugs to: https://github.com/NobleFactor/roonserver-image/issues
+.SH AUTHOR
+Written by NobleFactor
+.SH SEE ALSO
+.BR launchctl (1),
+.BR launchd.plist (5),
+.BR sudo (8)
+.PP
+Roon Server documentation: https://help.roonlabs.com/
+.PP
+Troubleshooting guide: https://docs.google.com/document/d/1qWmUs5pWz4iu0M9RYO6FEU8a7QpUl7RNydbeZ7FgmCk/edit?usp=sharing

@@ -1,24 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-#################################################
+########################################################################################################################
+# Uninstall-RoonServer - Uninstalls Roon Server
 # Copyright (c) 2024 Noble Factor
 # SPDX Document reference
-#############################################
+########################################################################################################################
 
-# TODO (DANOBLE) Reference SPDX document that references MIT and Roon software terms and conditions.
+# TODO (david-noble) Reference SPDX document that references MIT and Roon software terms and conditions.
 
 set -o errexit -o nounset
 
 ###########
 # Variables
-###########
+###################
 
 declare -r script_root="$(cd "$(dirname "$0")" && pwd)"
 declare -r script_name="$(basename "$0")"
 
-###########
+###################
 # Functions
-###########
+###################
 
 function usage {
     echo ""
@@ -79,11 +80,11 @@ if ! systemctl list-unit-files roonserver.service >/dev/null; then
     error 1 "Roon Server is not installed."
 fi
 
-###########
+###################
 # Arguments
-###########
+###################
 
-declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,remove-data:" -- $* || echo exit)
+declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,remove-data" -- $* || echo exit)
 eval set -- "$args"
 
 while [[ $1 != '--' ]]; do
@@ -103,9 +104,9 @@ while [[ $1 != '--' ]]; do
 
 done
 
-######
+###################
 # Main
-######
+###################
 
 eval declare -A roon_environment=$(echo "( $(systemctl show roonserver --property Environment | cut -f2- -d= | sed 's/ROON_\([^ \t]*\)=/[ROON_\1]=/g') )")
 
@@ -127,20 +128,22 @@ fi
 if [[ -f "${roon_serverroot}/check.sh" ]] && "${roon_serverroot}/check.sh"; then
 
     note "Uninstalling Roon Server at '${roon_serverroot}'"
-    trap on_error_or_interrupt ERR SIGINT SIGKILL SIGTERM
+    trap on_error_or_interrupt ERR SIGINT SIGTERM
 
-    systemctl stop roonserver | true
-    rm --recursive --dir "${roon_serverroot}"
-    rm $(readlink --canonicalize-existing /etc/systemd/system/roonserver.service) /etc/systemd/system/roonserver.service
+    systemctl stop roonserver >/dev/null 2>&1 || true
 
-    if [[ remove_data == true ]]; then
-        note "Removing Roon data on '${roon_dataroot}'"
-        rm --recursive --dir "${roon_dataroot}/*"
+    rm -rf "${roon_serverroot}"
+    svc_link=$(readlink --canonicalize-existing /etc/systemd/system/roonserver.service || true)
+    rm -f -- "$svc_link" /etc/systemd/system/roonserver.service
+
+    if [[ "$remove_data" == true ]]; then
+        note "Removing Roon data directory '${roon_dataroot}/data' (backup and music are preserved)"
+        rm -rf "${roon_dataroot}/data"
     fi
     
     note "Completed."
 else
     note "Failed: The check for a runnable instance of Roon Server at '$roon_serverroot' failed. To resolve the issue, verify" \
-        "the Roon Server environment by running this command: sudo systemctl show roonserver --propert=Environment." \
+        "the Roon Server environment by running this command: sudo systemctl show roonserver --property=Environment." \
         "Troubleshoot from there."
 fi

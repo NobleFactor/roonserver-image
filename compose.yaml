@@ -1,0 +1,32 @@
+#################################################
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+#################################################
+
+# Environment variable defaults are shared with makefile for those who might build from docker compose command line 
+
+name: ${DOCKER_COMPOSE_PROJECT_NAME:-roonserver}
+services:
+  service:
+    container_name: ${DOCKER_CONTAINER_ROONSERVER:-roonserver-service}
+    hostname: ${DOCKER_CONTAINER_ROONSERVER:-roonserver-service}
+    image: ${DOCKER_IMAGE_ROONSERVER:-roonserver}
+    platform: linux/amd64
+    networks:
+      - external_network
+    volumes:
+      - type: bind
+        source: ~/Documents/Roon/Backup
+        target: ${ROON_DATAROOT:-/opt/local/var/roon}/backup
+      - type: bind
+        source: ~/Documents/Roon/Data
+        target: ${ROON_DATAROOT:-/opt/local/var/roon}/data
+      - type: bind
+        source: ~/Documents/Roon/Music
+        target: ${ROON_DATAROOT:-/opt/local/var/roon}/music
+    command: [ "--roon-user-uid", "${ROON_USER_UID}", "--roon-user-gid", "${ROON_USER_GID}" ]
+    restart: unless-stopped
+networks:
+  external_network:
+    name: ${MACVLAN_NETWORK_NAME}
+    external: true

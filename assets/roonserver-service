@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+########################################################################################################################
+# docker-entrypoint - Docker entrypoint script for Roon Server
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+########################################################################################################################
+
+# TODO (david-noble) Reference SPDX document that references MIT and Roon software terms and conditions.
+
+set -o errexit -o nounset -o pipefail
+/app/Start-AvahiDaemon --daemonize && exec /app/Install-RoonServer "$@"

@@ -1,13 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-#################################################
+########################################################################################################################
+# Install-RoonServer - Installs, configures, and starts Roon Server
 # Copyright (c) 2024 Noble Factor
 # SPDX Document reference
-#############################################
+########################################################################################################################
 
-# TODO (DANOBLE) Reference SPDX document that references MIT and Roon software terms and conditions.
+# TODO (david-noble) Reference SPDX document that references MIT and Roon software terms and conditions.
 
-set -o errexit -o nounset
+set -o errexit -o nounset -o pipefail
 
 ###########
 # Variables
@@ -15,6 +16,25 @@ set -o errexit -o nounset
 
 declare -r script_root="$(cd "$(dirname "$0")" && pwd)"
 declare -r script_name="$(basename "$0")"
+
+declare -r prefix=/opt/local
+
+# From the environment with defaults for the benefit of users who might wish to self-install
+
+declare -r roon_serverroot="${ROON_SERVERROOT:-${prefix}/share/roon/roonserver}"
+declare -r roon_dataprefix="${ROON_DATAPREFIX:-${prefix}/var/roon}"
+
+# Derived from the environment
+
+declare -r roon_server_name="$(basename "$roon_serverroot")"
+declare -r roon_systemroot="${prefix}/lib/systemd/system"
+declare -r roon_service_name="${roon_server_name}.service"
+declare -r roon_service_path="${roon_systemroot}/${roon_service_name}"
+
+declare -r roon_approot="$(dirname "${roon_serverroot}")"
+declare -r roon_data_location="${roon_dataprefix}/data"
+declare -r roon_music_location="${roon_dataprefix}/music"
+declare -r roon_backup_location="${roon_dataprefix}/backup"
 
 ###########
 # Functions
@@ -28,7 +48,7 @@ NAME
        ${script_name} - installs, configures, and starts Roon Server
 
 SYNOPSIS
-       ${script_name} [--package <address>] [--timezone <>] [--help]
+       ${script_name} [--package <address>] [--roon-user-uid <roon-user-uid> --roon-user-gid <roon-user-gid>] [--timezone <timezone>] [--help]
 
 DESCRIPTION
        ${script_name} requires root privileges. It is useful for deploying a Roon Server to a dedicated Linux machine, and
@@ -93,20 +113,68 @@ OPTIONS
            Download address. Common addresses are file, ftp, and http locations.
            Default: https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2
 
+       --roon-user-uid
+           When running in a container, this is the User ID to assign to \$ROON_USER. This should be the numeric ID
+           of the user owner of \$ROON_DATAROOT on the Docker host.
+
+       --roon-user-gid
+           When running in a container, this is the Group ID to assign to \$ROON_USER. This should be the numeric ID
+           of the group owner of \$ROON_DATAROOT on the Docker host.
+
        --timezone
            Specifies the timezone for containers.
-           Default: Etc/UTC
-
+           Default: Etc/UTC.
 EOF
     exit 0
 }
 
-function new_targetdirectory {
+function New-RoonUser() {
+
+    # Reference: Run Roon Under Non-root at https://share.google/aimode/KVkn2jIJQRHh999jj
+
+    local -r user="${1:-}"
+    local -r uid="${2:-}"
+    local -r gid="${3:-${2:-}}"
+
+    if ! id "${user}" > /dev/null 2>&1; then
+        useradd --system --user-group --groups audio --no-create-home "${user}"
+    fi
+
+    if [[ -n ${uid:-} ]]; then
+        local -r current_uid="$(id --user "${user}")"
+        if [[ $current_uid != $uid ]]; then
+            if ! usermod --uid ${uid} "${user}" > /dev/null 2>&1; then
+                note "Retained user ID $(id --user "${user}") for Roon user ${user} because user ID ${uid} is assigned to $(getent passwd "${uid}")."
+            fi
+        fi
+    fi
+
+    if [[ -n ${gid:-} ]]; then
+        local -r current_gid="$(id --group "${user}")"
+        if [[ $current_gid != $gid ]]; then
+            if ! groupmod --gid "${gid}" "${user}" > /dev/null 2>&1; then
+                note "Retained primary group ID $(id --group "${user}") for Roon user ${user} because group Id ${gid} is assigned to $(getent group "${gid}")."
+            fi
+        fi
+    fi
+
+    note "Roon user: $(id "${user}")"
+
+    chown --verbose -R "${user}:${user}" "${roon_serverroot}"
+    
+    shopt -s nullglob
+    for f in /tmp/roon*; do
+        chown -R "${user}:${user}" "$f"
+    done
+    shopt -u nullglob
+}
+
+function New-TargetDirectory {
     
     local -r description="$1" target_directory="$2"
     
-    if mkdir -p $target_directory 2> /dev/null && [[ -r $target_directory ]] && [[ -w $target_directory ]]; then
-        note "${description} directory is on '$roon_serverroot'"
+    if mkdir -p "$target_directory" 2> /dev/null && [[ -r "$target_directory" ]] && [[ -w "$target_directory" ]]; then
+        note "${description} directory is ready at '$target_directory'"
     else
         error 1 "Failed to create r/w ${description} directory: '$target_directory'"
     fi
@@ -114,12 +182,12 @@ function new_targetdirectory {
 
 function error {
     local exit_code=$1 && shift 1
-    echo "[$(date --iso-8601=seconds)] ${script_name} error: $@" 1>&2
+    echo "[${script_name} error] $@" 1>&2
     exit $exit_code
 }
 
 function note {
-    echo "[$(date --iso-8601=seconds)] ${script_name} note: $@"
+    echo "[${script_name} note] $@"
 }
 
 function on_error_or_interrupt {
@@ -127,14 +195,13 @@ function on_error_or_interrupt {
     local -r service_unit_filename=/etc/systemd/system/${roon_service_name}
     local -r real_service_unit_filename=$(readlink --canonicalize-missing ${service_unit_filename})
 
-    systemctl stop "$roon_server_name" 2>&1 > /dev/null | true
+    systemctl stop "$roon_server_name" >/dev/null 2>&1 || true
     
     rm -rf \
         "$roon_serverroot" \
         "$roon_service_path" \
-        "$roon_dataroot/*" \
         "$service_unit_filename" \
-        "$real_service_unit_filename" | true
+        "$real_service_unit_filename" >/dev/null 2>&1 || true
 
     ln --force --symbolic ${previous_localtime} /etc/localtime
 }
@@ -153,15 +220,11 @@ if [[ $arch != x86_64 ]]; then
     error 1 "Requires x86_64, not $arch."
 fi
 
-if ! (which systemctl > /dev/null && [[ -d /etc/systemd/system ]]); then
-    error 1 "Requires systemd service manager."
-fi
-
 ###########
 # Arguments
 ###########
 
-declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,package:,timezone:" -- $* || echo exit)
+declare -r args=$(getopt --name "$script_name" --options "h" --longoptions "help,roon-package:,roon-user:,timezone:" -- $* || echo exit)
 eval set -- "$args"
 
 while [[ $1 != '--' ]]; do
@@ -170,8 +233,17 @@ while [[ $1 != '--' ]]; do
         usage; # does not return
         shift 1
         ;;
-    --package)
+    --roon-package)
         declare -r package="$2"
+        shift 2
+        ;;
+    --roon-user)
+        eval $(echo "$2" | awk -F':' '
+        {
+            print "roon_user=''" $1 "''"
+            print "roon_user_uid=''" $2 "''"
+            print "roon_user_gid=''" $3 "''"
+        }')
         shift 2
         ;;
     --timezone)
@@ -185,32 +257,15 @@ while [[ $1 != '--' ]]; do
 
 done
 
-[[ -n ${package:-} ]] || declare -r package='https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2'
-[[ -n ${timezone:-} ]] || declare -r timezone='Etc/UTC'
-
-###########
-# Constants
-###########
-
-declare -r roon_serverroot="${ROON_SERVERROOT:-/opt/local/share/roon/roonserver}"
-declare -r roon_dataroot="${ROON_DATAROOT:-/opt/local/var/roon}"
-declare -r roon_approot="$(dirname "${roon_serverroot}")"
-declare -r roon_systemroot="/opt/local/lib/systemd/system"
-
-declare -r roon_server_name="$(basename "$roon_serverroot")"
-declare -r roon_music_location="${roon_dataroot}/music"
-declare -r roon_backup_location="${roon_dataroot}/backup"
-
-declare -r roon_service_name="${roon_server_name}.service"
-declare -r roon_service_path="${roon_systemroot}/${roon_service_name}"
+[[ -n ${package:-}   ]] || declare -r package='https://download.roonlabs.net/builds/RoonServer_linuxx64.tar.bz2'
+[[ -n ${roon_user:-} ]] || declare -r roon_user=${ROON_USER:-roon}
+[[ -n ${timezone:-}  ]] || declare -r timezone='Etc/UTC'
 
 ###########
 # Main
 ###########
 
-# Install and configure roonserver if systemctl tells us that the roonserver.service unit is absent
-
-if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
+if [[ ! -f "/etc/systemd/system/${roon_service_name}" ]]; then
 
     declare -r previous_localtime=$(readlink /etc/localtime)
 
@@ -219,7 +274,8 @@ if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
     echo "-----------------------------------------"
     echo ""
 
-    trap on_error_or_interrupt ERR SIGINT SIGKILL SIGTERM
+    trap on_error_or_interrupt ERR SIGINT SIGTERM
+    /usr/sbin/avahi-daemon --version
     set | grep "^roon_.*"
     echo ""
 
@@ -231,32 +287,24 @@ if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
 
     # Setup directory structure
     
-    new_targetdirectory 'Roon Server' $roon_serverroot
-    new_targetdirectory 'Roon Server data' $roon_dataroot/data
-    new_targetdirectory 'Roon Server service unit file' $roon_systemroot
-    new_targetdirectory 'Roon music' $roon_music_location
-    new_targetdirectory 'Roon backup' $roon_backup_location
+    New-TargetDirectory 'Roon Server' "$roon_serverroot"
+    New-TargetDirectory 'Roon Server service unit file' "$roon_systemroot"
+    New-TargetDirectory 'Roon data' "$roon_data_location"
+    New-TargetDirectory 'Roon music' "$roon_music_location"
+    New-TargetDirectory 'Roon backup' "$roon_backup_location"
 
-    # Verify that the Roon Server directory and the Roon data directory aren't the same
-    # Rationale: This causes difficult update issues.
+    # Ensure data root and server root are distinct paths
+    ## Rationale provided by Roon: This causes difficult update issues (and we concur).
 
-    rm -f $roon_dataroot/check-for-common-target-directory
-    touch $roon_serverroot/check-for-common-target-directory
-
-    if [[ -f $roon_dataroot/check-for-shared-with-data ]]; then
-
-        target="$(readlink --canonicalize-existing "${roon_dataroot}")"
-        
-        error 1 "Roon data and server directories cannot refer to the same location as this causes difficult update" \
-            "issues. Address the problem segregating these directories:" \
-            "$(find "$(findmnt -o TARGET -cenT "$target")" -mount -samefile "$target")"
+    if [[ "$(readlink -f "$roon_data_location")" == "$(readlink -f "$roon_serverroot")" ]]; then
+        error 1 "ROON_DATAROOT ($roon_data_location) and ROON_SERVERROOT ($roon_serverroot) must not be the same path."
     fi
 
     note "Downloading and unpacking Roon Server from '${package}' to '${roon_serverroot}'"
 
     cd "${roon_approot}"
     rm -rf "${roon_server_name}"/*
-    curl --location "${package}" --output "${package##*/}" --progress-bar
+    curl --location "${package}" --output "${package##*/}" --no-progress-meter
     tar -xjf "${package##*/}" --directory ${roon_server_name} --strip-components=1
 
     # Check installation and clean up
@@ -265,7 +313,7 @@ if ! systemctl list-unit-files "${roon_service_name}" >/dev/null; then
     "${roon_server_name}/check.sh"
     rm -f "${package##*/}"
 
-    # Create service unit
+    # Create service unit (whether we're running on docker without the systemd service manager or not)
 
     cat > "${roon_service_path}" << END_SERVICE_UNIT
 [Unit]
@@ -274,10 +322,10 @@ After=network-online.target
 
 [Service]
 Type=simple
-User=root
+User=${roon_user}
 Environment=ROON_SERVERROOT="${roon_serverroot}"
-Environment=ROON_DATAROOT="${roon_dataroot}/data"
-Environment=ROON_ID_DIR="${roon_dataroot}/data"
+Environment=ROON_DATAROOT="${roon_data_location}"
+Environment=ROON_ID_DIR="${roon_data_location}"
 ExecStart="${roon_serverroot}/start.sh"
 Restart=on-abort
 
@@ -285,8 +333,8 @@ Restart=on-abort
 WantedBy=multi-user.target
 END_SERVICE_UNIT
 
-    ln --force --symbolic "${roon_service_path}" "/etc/systemd/system/${roon_service_name}"
-    trap - ERR SIGINT SIGKILL SIGTERM
+    mkdir -p /etc/systemd/system && ln --force --symbolic "${roon_service_path}" "/etc/systemd/system/${roon_service_name}"
+    trap - ERR SIGINT SIGTERM
 fi
 
 echo "-------------------------------------"
@@ -294,18 +342,16 @@ echo "S T A R T I N G  R O O N  S E R V E R"
 echo "-------------------------------------"
 echo ""
 
-if [[ $(systemctl is-enabled "${roon_service_name}") != enabled ]]; then
-    note "Enabling ${roon_service_name}"
-    systemctl enable "${roon_service_name}"
-fi
+New-RoonUser "$roon_user" "${roon_user_uid:-}" "${roon_user_gid:-}"
 
 if [[ -f /.dockerenv ]]; then
     note "Invoking ${roon_serverroot}/start.sh"
-    export ROON_SERVERROOT="${roon_serverroot}"
-    export ROON_DATAROOT="${roon_dataroot}/data"
-    export ROON_ID_DIR="${roon_dataroot}/data"
-    "${roon_serverroot}/start.sh"
+    ROON_SERVERROOT="${roon_serverroot}" ROON_DATAROOT="${roon_data_location}" ROON_ID_DIR="${roon_data_location}" ROON_USER="${roon_user}" exec "${roon_serverroot}/start.sh"
 else
+    if [[ $(systemctl is-enabled "${roon_service_name}") != enabled ]]; then
+        note "Enabling ${roon_service_name}"
+        systemctl enable "${roon_service_name}"
+    fi
     systemctl start "${roon_service_name}"
     systemctl status "${roon_service_name}"
 fi

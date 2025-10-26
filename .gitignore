@@ -1,0 +1,30 @@
+# ----------------------------- #
+# Multi-platform OS file turds  #
+# ----------------------------- #
+
+### macOS ###
+# Exclude macOS metadata files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+### Linux ###
+# Exclude Linux thumbnail and lock files
+*~
+.#*
+*.swp
+*.bak
+.directory
+.fuse_hidden*
+
+### Windows ###
+# Exclude Windows system files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/

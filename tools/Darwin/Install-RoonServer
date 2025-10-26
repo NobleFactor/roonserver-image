@@ -1,0 +1,223 @@
+#!/bin/bash
+#
+# Install-RoonServer - Install and configure Roon Server as a system-wide macOS LaunchDaemon
+#
+# Copyright (c) 2024 Noble Factor
+# MIT License - See LICENSE.md for full license text
+#
+# SYNOPSIS
+#   Install-RoonServer [OPTIONS]
+#
+# DESCRIPTION
+#   This script downloads, installs, and configures Roon Server as a system-wide
+#   LaunchDaemon on macOS. It sets up the necessary directories, permissions, and
+#   environment variables for Roon Server to run automatically at system startup.
+#
+#   The script must be run with root privileges (using sudo).
+#
+# OPTIONS
+#   -h, --help
+#       Display usage information and exit.
+#
+#   --roon-dataprefix PATH
+#       Specify the directory prefix for Roon data storage. The actual data will
+#       be stored in PATH/Data. Defaults to ~/Documents/Roon (where ~ is the home
+#       directory of the user invoking sudo).
+#
+#   --roon-user USERNAME
+#       Specify the username under which the RoonServer daemon will run.
+#       Defaults to $SUDO_USER (the user who invoked sudo).
+#
+# EXAMPLES
+#   # Install with default settings
+#   sudo Install-RoonServer
+#
+#   # Install with custom data directory
+#   sudo Install-RoonServer --roon-dataprefix /Volumes/Storage/Roon
+#
+#   # Install with custom user and data directory
+#   sudo Install-RoonServer --roon-user roonuser --roon-dataprefix /opt/roon
+#
+# POST-INSTALLATION
+#   After installation, you must grant local area network access to Roon Server
+#   through the macOS GUI:
+#   1. Go to System Settings > Privacy & Security > Local Network
+#   2. Find Roon Server in the list
+#   3. Toggle the switch to allow network access
+#
+# FILES
+#   /Library/LaunchDaemons/com.noblefactor.roon.RoonServer.plist
+#       The LaunchDaemon configuration file
+#
+#   /Applications/Roon.app
+#       The installed Roon application
+#
+#   /var/log/roon/
+#       Directory containing RoonServer log files
+#
+# EXIT STATUS
+#   0   Success
+#   1   Error occurred (insufficient privileges, installation failure, etc.)
+#
+# AUTHOR
+#   NobleFactor
+#
+# SEE ALSO
+#   launchctl(1), launchd.plist(5)
+#
+
+source Declare-BashScript "$0" "h" "help:,roon-dataprefix:,roon_user:" "$@"
+
+if [[ $EUID -ne 0 ]]; then
+    error 1 "Must run as root."
+fi
+
+###########
+# Arguments
+###########
+
+eval set -- "$script_arguments"
+
+while :; do
+    case "$1" in
+        --help|-h)
+            usage ;# does not return
+            ;;  
+        --roon-dataprefix)
+            declare -r roon_dataprefix="$2"
+            shift 2
+            ;;  
+        --roon-user)
+            declare -r roon_user="$2"
+            shift 2
+            ;;  
+        --) 
+            shift
+            break
+            ;;  
+        *)
+            error 1 "Unrecognized option: $1" ;# does not return
+            ;;  
+    esac
+done
+
+[[ -n ${roon_dataprefix:-} ]] || declare -r roon_dataprefix=$(eval "echo ~${SUDO_USER}/Documents/Roon")
+[[ -n ${roon_user:-} ]] || declare -r roon_user=$SUDO_USER
+
+###########
+# Functions
+###########
+
+function cleanup {
+
+    note "Cleaning up..."
+
+    if mount | grep --fixed-strings " on ${roon_dir} ("; then
+        hdiutil detach "${roon_dir}"
+    fi
+
+    rm -rf "${roon_dir}" "${roon_dmg}"
+
+    note "Done."
+}
+
+###########
+# Main
+###########
+
+# Prologue
+
+declare -r roon_download=https://download.roonlabs.net/builds/Roon.dmg
+declare -r roon_dmg=~/Downloads/$(basename "${roon_download}")
+declare -r roon_dir=${roon_dmg%.*}
+declare -r roon_approot=/Applications/Roon.app
+declare -r roon_serverroot=${roon_approot}/Contents/RoonServer.app
+
+trap cleanup EXIT
+
+# Download, mount, and copy Roon to /Applications
+
+note "Downloading ${roon_dmg}…"
+curl --output "${roon_dmg}" --progress-bar "${roon_download}"
+mkdir -p "${roon_dir}"
+hdiutil attach -mountpoint "${roon_dir}" "${roon_dmg}"
+rm -rf /Applications/Roon.app
+cp -R "${roon_dir}/Roon.app" /Applications/
+
+success "Roon app installed."
+
+# Setup system-wide RoonServer launch daemon
+
+declare -r roon_serverlabel="com.noblefactor.roon.RoonServer"
+declare -r roon_serverplist="/Library/LaunchDaemons/${roon_serverlabel}.plist"
+declare -r roon_dataroot="${roon_dataprefix}/Data"
+declare -r roon_id_dir="${roon_dataprefix}"
+declare -r roon_log_dir=/var/log/roon
+
+mkdir -p "${roon_log_dir}"
+chown -R "${roon_user}:wheel" "${roon_log_dir}"
+chmod -R 755 "${roon_log_dir}"
+
+cat > "${roon_serverplist}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${roon_serverlabel}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${roon_serverroot}/Contents/MacOS/RoonServer</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ROON_DATAROOT</key>
+        <string>${roon_dataroot}/Data</string>
+        <key>ROON_ID_DIR</key>
+        <string>${roon_id_dir}</string>
+    </dict>
+    <key>UserName</key>
+    <string>${roon_user}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/roon/RoonServer.out</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/roon/RoonServer.err</string>
+</dict>
+</plist>
+EOF
+
+# Set ownership & permissions as required by launchd
+
+chown root:wheel "${roon_serverplist}"
+chmod 644 "${roon_serverplist}"
+
+# Load RoonServer
+
+launchctl bootout --wait system/"${roon_serverlabel}" || true  # risky since this operation fails for many reasons, not just because the service is already booted out
+
+declare -r stray_processes="$(ps -A | awk '/\/Applications\/Roon\.app\/Contents\// { print $1 }')"
+[[ -z ${stray_processes:-} ]] || kill ${stray_processes}
+
+if ! launchctl bootstrap system/ "${roon_serverplist}"; then
+    error 1 "Failed to bootstrap RoonServer launch daemon. Check '${roon_serverplist}' for errors."
+fi
+
+success "RoonServer launch daemon created and loaded.
+  ROON_SERVERPLIST=${roon_serverplist}
+  ROON_DATAROOT=${roon_dataroot}
+  ROON_ID_DIR=${roon_id_dir}
+  ROON_USER=${roon_user}"
+
+if launchctl start "$(basename "${roon_serverplist}")"; then
+    declare -r roon_server_running="$(launchctl list | grep $'\tcom.roon.RoonServer')"
+    if [[ -n ${roon_server_running:-} ]]; then
+        success "RoonServer is running: ${roon_server_running}."
+    fi
+    launchctl print system/com.noblefactor.roon.RoonServer  
+else
+    error 1 "Failed to start RoonServer launch daemon. Here is a troubleshooting guide: https://docs.google.com/document/d/1qWmUs5pWz4iu0M9RYO6FEU8a7QpUl7RNydbeZ7FgmCk/edit?usp=sharing"
+fi

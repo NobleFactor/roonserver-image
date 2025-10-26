@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+
+# TODO (david-noble) Reference SPDX document that references MIT and Roon software terms and conditions.
+
+########################################################################################################################
+# Start-AvahiDaemon - Starts avahi-daemon with the D-Bus system bus
+# Copyright (c) 2024 Noble Factor
+# SPDX Document reference
+########################################################################################################################
+
+# Start-AvahiDaemon -- Starts the avahi-daemon in a container where--by default--systemd is unavailable.
+#
+# Requirements:
+# --------------
+# - apt install --no-install-recommends dbus avahi-daemon libnss-mdns ca-certificates
+#
+# For Diagnostics and Troubleshooting:
+# ------------------------------------
+# - apt install --no-install-recommends avahi-utils iproute2 procps vim
+#
+# Reference:
+# ----------
+# 1. https://blog.christophersmart.com/2020/03/30/resolving-mdns-across-vlans-with-avahi-on-openwrt/
+# 2. https://docs.google.com/document/d/1Hs_HvIkeW3HchU3ABBuD6tDdQ13umhQ109uZpTAufYw/edit?usp=sharing
+# 3. https://docs.google.com/document/d/1aof7uhCzXYP9Ad6rgSLB0_sG7HLBLW2sRIDBwEMmIEY/edit?tab=t.0
+
+set -o errexit -o nounset
+
+mkdir -p /run/dbus /run/avahi-daemon  ;# ensure run-time directories exist
+rm -f /run/dbus/pid /run/avahi-daemon/pid  ;# remove stale pid files
+dbus-daemon --system --fork && exec avahi-daemon --debug --no-drop-root --no-rlimits "$@" 
