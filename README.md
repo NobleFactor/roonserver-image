@@ -249,10 +249,10 @@ sudo ./Install-RoonServer
 │   └── roonserver-service         # Container entrypoint
 ├── tools/
 │   └── Darwin/
-│       ├── Install-RoonServer              # Native macOS installer
-│       ├── Install-RoonServer.1            # Man page
+│       ├── Install-RoonServer     # Native macOS installer
+│       ├── Install-RoonServer.1   # Man page
 │       ├── Install-RoonServer.bash-completion
-│       ├── _Install-RoonServer             # Zsh completion
+│       ├── _Install-RoonServer    # Zsh completion
 │       └── README.md
 ├── compose.yaml                   # Docker Compose configuration
 ├── Dockerfile                     # Container image definition
